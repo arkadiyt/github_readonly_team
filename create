@@ -1,0 +1,31 @@
+#!/usr/bin/env ruby
+
+require 'bundler/setup'
+require 'github_api'
+
+def create(oauth_token, organization_name, team_name)
+  github = Github.new(oauth_token: oauth_token)
+
+  # Need to enumerate teams to find team_id
+  team = github.orgs.teams.list(org: organization_name).find do |team|
+    team.name == team_name
+  end
+  raise StandardError, "Couldn't find team #{team_name}" unless team
+
+  # Enumerate repositories, add read-only access to team
+  github.repositories.list(org: organization_name, per_page: 100).each_page do |page|
+    page.each do |repo|
+      puts "Adding #{repo.name}"
+      github.orgs.teams.add_repository(
+        id: team.id,
+        repo: repo.name,
+        user: organization_name,
+        permission: 'pull'
+      )
+    end
+  end
+end
+
+if $0 == __FILE__
+  create(ENV['GITHUB_API_TOKEN'], ARGV[0], ARGV[1])
+end
